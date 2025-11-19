@@ -1,0 +1,45 @@
+---
+title: "FinalProjMD"
+author: "Emily Nelson"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+##Intro & Setup
+
+```{r}
+
+
+
+```
+
+
+
+##UI
+
+```{r}
+
+
+
+```
+
+
+
+##Server
+
+```{r}
+
+
+
+```
+
+
+
+##Run the App
+
+```{r}
+
+shinyApp(ui, server)
+
+```

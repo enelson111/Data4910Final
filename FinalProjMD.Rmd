@@ -10,7 +10,8 @@ output: html_document
 
 ```{r}
 
-
+library(shiny)
+library(bslib)
 
 ```
 
@@ -21,6 +22,82 @@ output: html_document
 ```{r}
 
 
+ui <- navbarPage(
+  title = "Dashboard",
+  theme = bs_theme(bootswatch = "flatly"), 
+  
+  #overview page
+  tabPanel(
+    "Overview",
+    fluidPage(
+      h2("planning to have overview of project here"), 
+      br()
+    )
+  ),
+  
+  #dataset 1
+  tabPanel(
+    "Dataset 1",
+    sidebarLayout(
+      sidebarPanel(
+        h3("Sidebar"),
+        p("planning to have dataset description and user inputs here"),
+        width = 3
+      ),
+      mainPanel(
+        tabsetPanel(
+          tabPanel("Tab 1", h4("Tab 1 content here")),
+          tabPanel("Tab 2", h4("Tab 2 content here")),
+          tabPanel("Tab 3", h4("Tab 3 content here")),
+          tabPanel("Tab 4", h4("Tab 4 content here"))
+        ),
+        width = 9
+      )
+    )
+  ),
+  
+  #dataset 2
+  tabPanel(
+    "Dataset 2",
+    sidebarLayout(
+      sidebarPanel(
+        h3("Sidebar"),
+        p("planning to have dataset description and user inputs here"), 
+        width = 3
+      ),
+      mainPanel(
+        tabsetPanel(
+          tabPanel("Tab 1", h4("Tab 1 content here")),
+          tabPanel("Tab 2", h4("Tab 2 content here")),
+          tabPanel("Tab 3", h4("Tab 3 content here")),
+          tabPanel("Tab 4", h4("Tab 4 content here"))
+        ),
+        width = 9
+      )
+    )
+  ),
+  
+  #dataset 3
+  tabPanel(
+    "Dataset 3",
+    sidebarLayout(
+      sidebarPanel(
+        h3("Sidebar"),
+        p("planning to have dataset description and user inputs here"), 
+        width = 3
+      ),
+      mainPanel(
+        tabsetPanel(
+          tabPanel("Tab 1", h4("Tab 1 content here")),
+          tabPanel("Tab 2", h4("Tab 2 content here")),
+          tabPanel("Tab 3", h4("Tab 3 content here")),
+          tabPanel("Tab 4", h4("Tab 4 content here"))
+        ),
+        width = 9
+      )
+    )
+  )
+)
 
 ```
 
@@ -30,7 +107,7 @@ output: html_document
 
 ```{r}
 
-
+server <- function(input, output, session) {}
 
 ```
 

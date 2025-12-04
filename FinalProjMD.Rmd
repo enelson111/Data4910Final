@@ -196,7 +196,7 @@ ui <- navbarPage( #starts the main navigation panel for the app
             " Compare key metrics, price distributions, and host activity for Airbnb listings in major US cities, highlighting changes between 2020 and 2023. Features year-over-year KPIs, a box plot for price analysis, and an interactive map of listings."
           )
         ),
-        p(strong("Note:"), " This app is pre-configured for WDI (`world_bank_development_indicators.csv`), `AB_US_2020.csv`, and `AB_US_2023.csv`. Please ensure these files are available in the app directory for the full functionality.")
+        p(strong("Note:"), " This app is pre-configured for WDI ('world_bank_development_indicators.csv'), 'AB_US_2020.csv', and 'AB_US_2023.csv'. Please ensure these files are available in the app directory for the full functionality.")
       ) 
     ) 
   ), 
@@ -434,10 +434,37 @@ server <- function(input, output, session) { #defines the server function
                addPopups(0, 0, paste("No indicator data available for", input$wdi_map_yr)) #adds an informative popup
       )} 
     pal <- colorNumeric("viridis", domain = world_join$indicator, na.color = "transparent") #creates a color palette based on indicator values
-    leaflet(world_join) %>% addTiles() %>% #initializes leaflet with the joined map data and tiles
+    l <- leaflet(world_join) %>% addTiles() %>% #initializes leaflet with the joined map data and tiles
       addPolygons(fillColor = ~pal(indicator), weight = 1, opacity = 1, color = "white", fillOpacity = 0.7, #adds country boundaries colored by the indicator
                   label = ~paste(name_long, ":", round(indicator, 2))) %>% #adds country name and indicator value to the hover label
       addLegend(pal = pal, values = ~indicator, title = input$wdi_indicator, position = "bottomright") #adds a legend for the color scale
+    
+    ###define year annotation
+    year_label <- paste0( #start defining the html string for the year watermark
+      '<div style="', #start html div with inline css
+      '  position: fixed; ', #make position fixed relative to the view
+      '  top: 50%; ', #center vertically
+      '  left: 50%; ', #center horizontally
+      '  transform: translate(-50%, -50%); ', #adjust for element size to truly center
+      '  margin-left: 12.5%; ', #shift right to visually center in the main panel area
+      '  opacity: 0.3; ', #make the text semi-transparent
+      '  font-size: 100px; ', #make the font very large
+      '  font-weight: bold; ', #make the font bold
+      '  color: #333; ', #set the text color
+      '  pointer-events: none; ', #prevent text from blocking mouse events on the map
+      '  z-index: 999;', #ensure the text is above other map elements
+      '">', 
+      input$wdi_map_yr, #insert the selected year value
+      '</div>' 
+    )
+    
+    #add the custom year watermark control to the map
+    l <- l %>% #assign the modified map back to l
+      addControl( #add a custom html control element to the leaflet map
+        html = year_label, #use the generated year label html
+        position = "topleft" 
+      )
+    l 
   })
   
   ####data table and download logic

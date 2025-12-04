@@ -162,58 +162,6 @@ install.packages(c(
   "rlang", "purrr", "tidyr", "tibble", "plotly"
 ))
 ```
-## Required Data Files
-
-Place the following CSV files in the **same directory** as the R script:
-
-* `world_bank_development_indicators.csv`
-* `AB_US_2020.csv`
-* `AB_US_2023.csv`
-
-> **Note:** The app will run with dummy data if files are missing, but for full functionality, ensure all three files are present.
-
----
-
-## Running the Application
-
-1.  Open **`FinalProj.R`** in RStudio
-2.  Click the **"Run App"** button in the top-right corner of the editor
-3.  The dashboard will launch in a new window or your default browser
-
----
-
-##️ Navigating the Dashboard
-
-* Start on the **Overview** tab to understand the datasets.
-* **Explore WDI data:**
-    * Select countries of interest (try comparing regions like US, China, India)
-    * Adjust year range to focus on specific periods
-    * Switch between indicators to see different development metrics
-    * Use the map view to identify geographic patterns
-* **Analyze Airbnb trends:**
-    * Compare 2020 and 2023 to observe pandemic recovery patterns
-    * Filter by city and room type to segment the market
-    * Examine the host insights plot to understand listing behavior
-
----
-
-## Troubleshooting
-
-* **Error: "Package X is not installed"**
-    * Run `install.packages("X")` and restart the app
-* **Error: "File not found"**
-    * Verify CSV files are in the same directory as the R script
-    * The app will run with dummy data but with limited functionality
-* **Map not displaying properly:**
-    * Ensure `rnaturalearth` and `rnaturalearthdata` packages are installed
-    * Try running `rnaturalearth::ne_download(returnclass = "sf")` to download map data
-* **Performance issues with large datasets:**
-    * The app automatically downsamples map points to **1,000** for performance.
-    * Consider filtering to fewer countries/cities if the interface feels sluggish
-
----
-
-=======
 
 ## Required Data Files
 
@@ -229,13 +177,13 @@ Place the following CSV files in the **same directory** as the R script:
 
 ## Running the Application
 
-1.  Open **`FinalProj.R`** in RStudio
-2.  Click the **"Run App"** button in the top-right corner of the editor
-3.  The dashboard will launch in a new window or your default browser
+1. Open **`FinalProj.R`** in RStudio
+2. Click the **"Run App"** button in the top-right corner of the editor
+3. The dashboard will launch in a new window or your default browser
 
 ---
 
-####️ Navigating the Dashboard
+## Navigating the Dashboard
 
 * Start on the **Overview** tab to understand the datasets.
 * **Explore WDI data:**
@@ -267,64 +215,5 @@ Place the following CSV files in the **same directory** as the R script:
 ---
 
 ## Author and Date
-
-<<<<<<< HEAD
-=======
-=======
-
-## Required Data Files
-
-Place the following CSV files in the **same directory** as the R script:
-
-* `world_bank_development_indicators.csv`
-* `AB_US_2020.csv`
-* `AB_US_2023.csv`
-
-> **Note:** The app will run with dummy data if files are missing, but for full functionality, ensure all three files are present.
-
----
-
-## Running the Application
-
-1.  Open **`FinalProj.R`** in RStudio
-2.  Click the **"Run App"** button in the top-right corner of the editor
-3.  The dashboard will launch in a new window or your default browser
-
----
-
-##️ Navigating the Dashboard
-
-* Start on the **Overview** tab to understand the datasets.
-* **Explore WDI data:**
-    * Select countries of interest (try comparing regions like US, China, India)
-    * Adjust year range to focus on specific periods
-    * Switch between indicators to see different development metrics
-    * Use the map view to identify geographic patterns
-* **Analyze Airbnb trends:**
-    * Compare 2020 and 2023 to observe pandemic recovery patterns
-    * Filter by city and room type to segment the market
-    * Examine the host insights plot to understand listing behavior
-
----
-
-## Troubleshooting
-
-* **Error: "Package X is not installed"**
-    * Run `install.packages("X")` and restart the app
-* **Error: "File not found"**
-    * Verify CSV files are in the same directory as the R script
-    * The app will run with dummy data but with limited functionality
-* **Map not displaying properly:**
-    * Ensure `rnaturalearth` and `rnaturalearthdata` packages are installed
-    * Try running `rnaturalearth::ne_download(returnclass = "sf")` to download map data
-* **Performance issues with large datasets:**
-    * The app automatically downsamples map points to **1,000** for performance.
-    * Consider filtering to fewer countries/cities if the interface feels sluggish
-
----
-
-## Author and Date
-
->>>>>>> 5a14a89166cb845ffc70c619f02fdaabe3d849f8
 * **Author:** Emily Nelson
 * **Date:** 12-04-2025

@@ -1,17 +1,17 @@
 library(shiny)
-library(bslib) 
+library(bslib)
 library(dplyr)
-library(ggplot2) 
-library(DT) 
-library(leaflet) 
-library(sf) 
-library(rnaturalearth) 
-library(rnaturalearthdata) 
-library(rlang) 
+library(ggplot2)
+library(DT)
+library(leaflet)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(rlang)
 library(purrr)
 library(tidyr)
-library(tibble) 
-
+library(tibble)
+library(plotly) 
 
 kpi_box <- function(title, value_html, subtitle, color = "primary", icon_name = "bar-chart-fill", custom_style = "") {
   bg_class <- switch(color,
@@ -25,144 +25,147 @@ kpi_box <- function(title, value_html, subtitle, color = "primary", icon_name = 
                      "bg-primary text-white")
   
   icon_html <- tags$i(
-    class = paste0("bi bi-", icon_name), 
-    style = paste0("font-size: 3rem; margin-right: 1rem;", 
+    class = paste0("bi bi-", icon_name),
+    style = paste0("font-size: 3rem; margin-right: 1rem;",
                    if (grepl("text-white", bg_class)) "opacity: 0.6;" else "opacity: 0.4; color: #000;")
   )
   
   tags$div(
     class = paste("card shadow", bg_class),
-    style = paste("height: 100%; overflow: hidden; display: flex; align-items: center; padding: 1rem; margin-bottom: 0;", 
-                  custom_style), 
-
+    style = paste("height: 100%; overflow: hidden; display: flex; align-items: center; padding: 1rem; margin-bottom: 0;",
+                  custom_style),
+    
     tags$div(
       class = "d-flex flex-column align-items-start",
       style = "flex-grow: 1;",
-  
+      
       value_html,
       
-      p(class = "text-uppercase", 
-        style = "font-weight: 600; font-size: 0.75rem; margin: 0; line-height: 1;", 
+      p(class = "text-uppercase",
+        style = "font-weight: 600; font-size: 0.75rem; margin: 0; line-height: 1;",
         title
-      ), 
+      ),
       p(style = "font-size: 0.7rem; margin: 0; opacity: 0.8;", subtitle)
-    ))}
+    ))
+}
 
 h2_value <- function(val) {
   h2(style = "font-weight: 700; margin: 0; font-size: 2rem; line-height: 1.1;", val)
 }
 
-import_wdi <- "world_bank_development_indicators.csv" 
+import_wdi <- "world_bank_development_indicators.csv"
 if (file.exists(import_wdi)) {
-  wdi_data <- read.csv(import_wdi) %>%
-    mutate( 
-      Date_Parsed = as.Date(as.character(date), format = "%m/%d/%Y"), 
-      Year = suppressWarnings(as.integer(format(Date_Parsed, "%Y"))) 
-    ) %>% 
-    rename(Country = country) %>% 
-    select(-date, -Date_Parsed) %>% 
-    filter(!is.na(Year)) 
+  wdi_data_default <- read.csv(import_wdi) %>% 
+    mutate(
+      Date_Parsed = as.Date(as.character(date), format = "%m/%d/%Y"),
+      Year = suppressWarnings(as.integer(format(Date_Parsed, "%Y")))
+    ) %>%
+    rename(Country = country) %>%
+    select(-date, -Date_Parsed) %>%
+    filter(!is.na(Year))
 } else {
   message("WDI file not found. Using dummy data.")
-  wdi_data <- data.frame( 
-    Country = c("A", "B", "A", "B"), 
-    Year = c(2010, 2010, 2011, 2011), 
-    population = c(1e6, 2e6, 1.1e6, 2.1e6), 
-    GDP_current_US = c(1e10, 2e10, 1.1e10, 2.1e10), 
-    life_expectancy_at_birth = c(70, 80, 70.5, 80.5), 
-    population_density = c(10, 5, 11, 6), 
-    agricultural_land = c(50, 20, 51, 21), 
-    forest_land = c(10, 70, 10.5, 70.5), 
-    land_area = c(100000, 400000, 100000, 400000), 
-    birth_rate = c(15, 10, 15.2, 10.1), 
-    death_rate = c(7, 8, 7.1, 8.1), 
-    rural_population = c(200000, 400000, 210000, 410000) 
-  )} 
+  wdi_data_default <- data.frame(
+    Country = c("A", "B", "A", "B"),
+    Year = c(2010, 2010, 2011, 2011),
+    population = c(1e6, 2e6, 1.1e6, 2.1e6),
+    GDP_current_US = c(1e10, 2e10, 1.1e10, 2.1e10),
+    life_expectancy_at_birth = c(70, 80, 70.5, 80.5),
+    population_density = c(10, 5, 11, 6),
+    agricultural_land = c(50, 20, 51, 21),
+    forest_land = c(10, 70, 10.5, 70.5),
+    land_area = c(100000, 400000, 100000, 400000),
+    birth_rate = c(15, 10, 15.2, 10.1),
+    death_rate = c(7, 8, 7.1, 8.1),
+    rural_population = c(200000, 400000, 210000, 410000)
+  )
+}
 
-wdi_vars <- names(wdi_data) %>% setdiff(c("Country", "Year")) 
+wdi_vars <- names(wdi_data_default) %>% setdiff(c("Country", "Year")) 
 
-wdi_years <- sort(unique(wdi_data$Year)) 
-wdi_min_year <- if(length(wdi_years) > 0) min(wdi_years) 
-wdi_max_year <- if(length(wdi_years) > 0) max(wdi_years)
+wdi_years <- sort(unique(wdi_data_default$Year))
+wdi_min_year <- if(length(wdi_years) > 0) min(wdi_years) else 2010
+wdi_max_year <- if(length(wdi_years) > 0) max(wdi_years) else 2011
 
-world <- ne_countries(scale = "medium", returnclass = "sf") 
+world <- ne_countries(scale = "medium", returnclass = "sf")
 
-import_airbnb_2023 <- "AB_US_2023.csv" 
-import_airbnb_2020 <- "AB_US_2020.csv" 
+import_airbnb_2023 <- "AB_US_2023.csv"
+import_airbnb_2020 <- "AB_US_2020.csv"
 
-airbnb_cols <- c( 
-  "city", "neighbourhood", "room_type", "price", 
-  "latitude", "longitude", "number_of_reviews", "calculated_host_listings_count", 
-  "reviews_per_month" 
-) 
+airbnb_cols <- c(
+  "city", "neighbourhood", "room_type", "price",
+  "latitude", "longitude", "number_of_reviews", "calculated_host_listings_count",
+  "reviews_per_month"
+)
 
-load_airbnb <- function(file_path, year) { 
-  if (file.exists(file_path)) { 
-    data <- read.csv(file_path) %>% 
-      select(all_of(airbnb_cols)) %>% 
-      filter(price > 0 & price < 1000) %>% 
-      mutate(Year = as.factor(year)) %>% 
-      rename(City = city) 
-  } else { 
-    message(paste("File not found:", file_path, "Using dummy data for year", year)) 
-    data <- data.frame( 
-      City = c("New York", "Boston"), neighbourhood = c("Hells Kitchen", "Back Bay"), 
-      room_type = c("Entire home/apt", "Private room"), price = c(150, 75), 
-      latitude = c(40.75, 42.35), longitude = c(-73.99, -71.08), 
-      number_of_reviews = c(50, 20), calculated_host_listings_count = c(5, 1), 
-      reviews_per_month = c(2.5, 1.0), 
-      Year = as.factor(year) 
-    ) 
-  } 
+load_airbnb <- function(file_path, year) {
+  if (file.exists(file_path)) {
+    data <- read.csv(file_path) %>%
+      select(all_of(airbnb_cols)) %>%
+      filter(price > 0 & price < 1000) %>%
+      mutate(Year = as.factor(year)) %>%
+      rename(City = city)
+  } else {
+    message(paste("File not found:", file_path, "Using dummy data for year", year))
+    data <- data.frame(
+      City = c("New York", "Boston"), neighbourhood = c("Hells Kitchen", "Back Bay"),
+      room_type = c("Entire home/apt", "Private room"), price = c(150, 75),
+      latitude = c(40.75, 42.35), longitude = c(-73.99, -71.08),
+      number_of_reviews = c(50, 20), calculated_host_listings_count = c(5, 1),
+      reviews_per_month = c(2.5, 1.0),
+      Year = as.factor(year)
+    )
+  }
   return(data)
-} 
+}
 
-airbnb_2023 <- load_airbnb(import_airbnb_2023, 2023) 
-airbnb_2020 <- load_airbnb(import_airbnb_2020, 2020) 
+airbnb_2023 <- load_airbnb(import_airbnb_2023, 2023)
+airbnb_2020 <- load_airbnb(import_airbnb_2020, 2020)
 
-airbnb_data <- bind_rows(airbnb_2020, airbnb_2023) 
+airbnb_data <- bind_rows(airbnb_2020, airbnb_2023)
 
-airbnb_years <- sort(unique(airbnb_data$Year)) 
-airbnb_cities <- sort(unique(airbnb_data$City)) 
-airbnb_roomtypes <- sort(unique(airbnb_data$room_type)) 
+airbnb_years <- sort(unique(airbnb_data$Year))
+airbnb_cities <- sort(unique(airbnb_data$City))
+airbnb_roomtypes <- sort(unique(airbnb_data$room_type))
 
 
-ui <- navbarPage( 
-  title = "Project 3: Global Development and Airbnb Analysis", 
+ui <- navbarPage(
+  title = "Project 3: Global Development and Airbnb Analysis",
   theme = bs_theme(bootswatch = "flatly"),
   
-  tabPanel( 
-    "Overview", 
-    fluidPage( 
-      h2("Data Visualization Project with R Shiny"), 
-      p("This dashboard explores two real-world datasets: World Development Indicators (WDI) and US Airbnb Listings (2020 vs 2023)."), 
+  tabPanel(
+    "Overview",
+    fluidPage(
+      h2("Data Visualization Project with R Shiny"),
+      p("This dashboard explores two real-world datasets: World Development Indicators (WDI) and US Airbnb Listings (2020 vs 2023)."),
       
-      wellPanel( 
+      wellPanel(
         h3("Dashboard Structure and Data Sources"),
         p("The application is divided into two primary analysis sections:"),
-        tags$ul( 
-          tags$li( 
-            strong("World Development Indicators (WDI):"), 
+        tags$ul(
+          tags$li(
+            strong("World Development Indicators (WDI):"),
             " Use interactive controls to filter, visualize trends, and map WDI indicators (like GDP, Population, Life Expectancy) across different countries and years. Features a time-series plot, a geographic map, and a data table."
           ),
-          tags$li( 
+          tags$li(
             strong("Airbnb Listings (2020 vs 2023):"),
             " Compare key metrics, price distributions, and host activity for Airbnb listings in major US cities, highlighting changes between 2020 and 2023. Features year-over-year KPIs, a box plot for price analysis, and an interactive map of listings."
           )
         ),
-        p(strong("Note:"), " This app is pre-configured for WDI ('world_bank_development_indicators.csv'), 'AB_US_2020.csv', and 'AB_US_2023.csv'. Please ensure these files are available in the app directory for the full functionality.")
-      ) 
-    ) 
-  ), 
+        p(strong("Note:"), " This app is pre-configured for WDI ('world_bank_development_indicators.csv'), 'AB_US_2020.csv', and 'AB_US_2023.csv'. Please ensure these files are available in the app directory for the full functionality. You may also upload your own WDI dataset to explore.")
+      )
+    )
+  ),
   
-  tabPanel( 
+  
+  tabPanel(
     "Global Development (WDI)",
     sidebarLayout(
       sidebarPanel(
-        h3("WDI Explorer Controls"), 
-        width = 3, 
+        h3("WDI Explorer Controls"),
+        width = 3,
         selectizeInput(inputId = "wdi_countries", label = "Select Countries:",
-                       choices = sort(unique(wdi_data$Country)),
+                       choices = sort(unique(wdi_data_default$Country)),
                        selected = c("United States", "India", "China"),
                        multiple = TRUE),
         sliderInput(inputId = "wdi_years", label = "Select Year Range:",
@@ -174,8 +177,21 @@ ui <- navbarPage(
         selectizeInput(inputId = "wdi_table_cols", label = "Select Columns for Table/Download:",
                        choices = wdi_vars,
                        selected = c("GDP_current_US", "life_expectancy_at_birth", "population", "Year"),
-                       multiple = TRUE)
-      ), 
+                       multiple = TRUE),
+        wellPanel( 
+          h4("Custom File"),
+          fileInput("wdi_file", "Upload Custom WDI CSV (Optional)", accept = ".csv"),
+          conditionalPanel(
+            condition = "output.wdi_custom_uploaded",
+            hr(),
+            h5("Map Your Variables"),
+            uiOutput("wdi_country_map"),
+            uiOutput("wdi_year_map"),
+            uiOutput("wdi_indicator_maps"),
+            actionButton("wdi_apply", "Apply Configuration", class = "btn-primary"),
+            hr()
+          )
+        )),
       mainPanel(
         tabsetPanel(
           tabPanel("Summary KPIs", h4("Key Global Development Indicators"), uiOutput("wdi_kpis")),
@@ -187,16 +203,17 @@ ui <- navbarPage(
           tabPanel("Data Table", h4("Filtered WDI Data"),
                    dataTableOutput("wdi_table"),
                    downloadButton("download_wdi_data", "Download Filtered Data"))
-        ), 
-        width = 9 
-      ))), 
+        ),
+        width = 9
+      ))
+  ),
   
   tabPanel(
     "Airbnb Listings (2020 vs 2023)",
     sidebarLayout(
       sidebarPanel(
         h3("Airbnb Analysis Controls"),
-        width = 3, 
+        width = 3,
         selectizeInput(inputId = "airbnb_years_comp", label = "Select Years for Comparison:",
                        choices = airbnb_years,
                        selected = airbnb_years,
@@ -213,32 +230,129 @@ ui <- navbarPage(
         sliderInput("airbnb_price_range", "Price Range ($):",
                     min = min(airbnb_data$price), max = max(airbnb_data$price),
                     value = c(50, 300))
-      ), 
+      ),
       mainPanel(
         tabsetPanel(
           tabPanel("Summary KPIs", h4("Key Performance Indicators"), uiOutput("airbnb_kpis")),
           tabPanel("City Analysis", h4("Price Distribution: Year-over-Year Comparison by City"), plotOutput("airbnb_box_plot")),
           tabPanel("Interactive Map", h4("Listing Locations"), leafletOutput("airbnb_map")),
           tabPanel("Host Insights", h4("Host Activity vs Reviews"),
-                   plotOutput("airbnb_host_plot"),) 
-        ), 
-        width = 9 
-      ))))
-
-
+                   plotOutput("airbnb_host_plot")) 
+        ),
+        width = 9
+      )))
+)
 
 
 server <- function(input, output, session) {
-  wdi_reactive <- reactive({ wdi_data })
+  wdi_data <- reactiveVal(wdi_data_default) 
+  wdi_raw_data <- reactiveVal(NULL) 
+  wdi_custom_uploaded <- reactiveVal(FALSE) 
+  wdi_reactive <- reactive({ wdi_data() }) 
   airbnb_reactive <- reactive({ airbnb_data })
   
+  observe({
+    df <- wdi_data()
+    countries <- sort(unique(df$Country))
+    years <- sort(unique(df$Year))
+    indicators <- setdiff(names(df), c("Country", "Year"))
+    
+    updateSelectizeInput(session, "wdi_countries", choices = countries, selected = head(countries, 3))
+    updateSliderInput(session, "wdi_years", min = min(years), max = max(years), value = c(min(years), max(years)))
+    updateSelectInput(session, "wdi_indicator", choices = indicators, selected = indicators[1])
+    updateSelectizeInput(session, "wdi_table_cols", choices = indicators, selected = head(indicators, 4))
+    
+    updateNumericInput(session, "wdi_map_yr", 
+                       value = max(years), 
+                       min = min(years), 
+                       max = max(years))
+  })
+  
+  output$wdi_custom_uploaded <- reactive({ !is.null(wdi_raw_data()) })
+  outputOptions(output, "wdi_custom_uploaded", suspendWhenHidden = FALSE)
+  
+  
+  observeEvent(input$wdi_file, {
+    req(input$wdi_file)
+    
+    df <- read.csv(input$wdi_file$datapath, stringsAsFactors = FALSE)
+    wdi_raw_data(df)
+    wdi_custom_uploaded(TRUE)
+    showNotification("File uploaded successfully. Map your variables now.", type = "message")
+  })
+  
+  output$wdi_country_map <- renderUI({
+    req(wdi_raw_data())
+    cols <- names(wdi_raw_data())
+    selectInput("wdi_country_col", "Country Column:", choices = cols, selected = cols[1])
+  })
+  
+  output$wdi_year_map <- renderUI({
+    req(wdi_raw_data())
+    cols <- names(wdi_raw_data())
+    selectInput("wdi_year_col", "Year Column:", choices = cols, selected = cols[2])
+  })
+  
+  output$wdi_indicator_maps <- renderUI({
+    req(wdi_raw_data())
+    cols <- names(wdi_raw_data())
+    indicator_cols <- setdiff(cols, c(input$wdi_country_col, input$wdi_year_col))
+    
+    tagList(
+      selectInput("wdi_gdp_col", "GDP Column:", choices = c("None", indicator_cols), selected = "None"),
+      selectInput("wdi_life_exp_col", "Life Expectancy Column:", choices = c("None", indicator_cols), selected = "None"),
+      selectInput("wdi_pop_col", "Population Column:", choices = c("None", indicator_cols), selected = "None")
+    )
+  })
+  
+  observeEvent(input$wdi_apply, {
+    req(wdi_raw_data(), input$wdi_country_col, input$wdi_year_col)
+    
+    df <- wdi_raw_data()
+    
+    mapping_vec <- c(
+      "Country" = input$wdi_country_col,
+      "Year" = input$wdi_year_col
+    )
+    
+    if (input$wdi_gdp_col != "None") mapping_vec["GDP_current_US"] <- input$wdi_gdp_col
+    if (input$wdi_life_exp_col != "None") mapping_vec["life_expectancy_at_birth"] <- input$wdi_life_exp_col
+    if (input$wdi_pop_col != "None") mapping_vec["population"] <- input$wdi_pop_col
+    
+    df <- df %>% rename(!!!mapping_vec)
+    
+    if ("Year" %in% names(df)) {
+      df <- df %>% 
+        mutate(Year = suppressWarnings(as.integer(Year))) %>% 
+        filter(!is.na(Year)) 
+    }
+    
+    wdi_data(df)
+    
+    countries <- sort(unique(df$Country))
+    years <- sort(unique(df$Year))
+    indicators <- setdiff(names(df), c("Country", "Year"))
+    
+    updateSelectizeInput(session, "wdi_countries", choices = countries, selected = head(countries, 3))
+    updateSliderInput(session, "wdi_years", min = min(years), max = max(years), value = c(min(years), max(years)))
+    updateSelectInput(session, "wdi_indicator", choices = indicators, selected = indicators[1])
+    updateSelectizeInput(session, "wdi_table_cols", choices = indicators, selected = head(indicators, 4))
+    
+    updateNumericInput(session, "wdi_map_yr",
+                       value = max(years),
+                       min = min(years),
+                       max = max(years))
+    
+    showNotification("Custom WDI data configured successfully! App charts and tables are updated.", type = "message")
+  })
+  
   wdi_filtered <- reactive({
-    df <- wdi_reactive()
+    df <- wdi_reactive() 
     req(input$wdi_countries, input$wdi_years)
-    df %>% 
+    df %>%
       filter(Country %in% input$wdi_countries,
              Year >= input$wdi_years[1], Year <= input$wdi_years[2])
-  }) 
+  })
   
   output$wdi_kpis <- renderUI({
     df <- wdi_filtered()
@@ -279,21 +393,21 @@ server <- function(input, output, session) {
           "Life Expectancy",
           h2_value(le_first %||% "N/A"),
           paste("Average in", first_year, "for selected countries"),
-          color = color_first_year,
+          color = color_first_year
         )), 
         column(4, kpi_box(
           "GDP",
           h2_value(paste0("$", gdp_first_formatted %||% "N/A", "B")),
           paste("Average in", first_year, "for selected countries"),
-          color = color_first_year,
+          color = color_first_year
         )), 
         column(4, kpi_box(
           "Population",
           h2_value(paste0(pop_first_formatted %||% "N/A", "M")),
           paste("Average in", first_year, "for selected countries"),
-          color = color_first_year,
-        ))
-      ), 
+          color = color_first_year
+        )) 
+      ),
       
       h3("Overall Averages Across Selected Range"),
       fluidRow(
@@ -301,21 +415,21 @@ server <- function(input, output, session) {
           "Life Expectancy",
           h2_value(avg_le %||% "N/A"),
           "Years (Average across all selected countries/years)",
-          color = color_overall_avg,
+          color = color_overall_avg
         )), 
         column(4, kpi_box(
           "GDP",
           h2_value(paste0("$", avg_gdp_formatted %||% "N/A", "B")),
           "Billions USD (Average across all selected countries/years)",
-          color = color_overall_avg,
+          color = color_overall_avg
         )), 
         column(4, kpi_box(
           "Population",
           h2_value(paste0(avg_pop_formatted %||% "N/A", "M")),
           "Millions (Average across all selected countries/years)",
-          color = color_overall_avg,
-        ))
-      ), 
+          color = color_overall_avg
+        )) 
+      ),
       
       h3(paste0("Metrics for Final Year (", last_year, ")")),
       fluidRow(
@@ -323,21 +437,22 @@ server <- function(input, output, session) {
           "Life Expectancy",
           h2_value(le_last %||% "N/A"),
           paste("Average in", last_year, "for selected countries"),
-          color = color_last_year,
+          color = color_last_year
         )), 
         column(4, kpi_box(
           "GDP",
           h2_value(paste0("$", gdp_last_formatted %||% "N/A", "B")),
           paste("Average in", last_year, "for selected countries"),
-          color = color_last_year,
+          color = color_last_year
         )), 
         column(4, kpi_box(
           "Population",
           h2_value(paste0(pop_last_formatted %||% "N/A", "M")),
           paste("Average in", last_year, "for selected countries"),
-          color = color_last_year,
-        ))))})
-  
+          color = color_last_year
+        ))) 
+    ) 
+  }) 
   
   
   output$wdi_time_series <- renderPlotly({
@@ -363,7 +478,7 @@ server <- function(input, output, session) {
     if (all(is.na(world_join$indicator))) {
       return(leaflet() %>% addTiles() %>% setView(lng = 0, lat = 0, zoom = 2) %>%
                addPopups(0, 0, paste("No indicator data available for", input$wdi_map_yr))
-      )} 
+      )}
     pal <- colorNumeric("viridis", domain = world_join$indicator, na.color = "transparent")
     l <- leaflet(world_join) %>% addTiles() %>%
       addPolygons(fillColor = ~pal(indicator), weight = 1, opacity = 1, color = "white", fillOpacity = 0.7,
@@ -377,23 +492,23 @@ server <- function(input, output, session) {
       '  left: 50%; ',
       '  transform: translate(-50%, -50%); ',
       '  margin-left: 12.5%; ',
-      '  opacity: 0.3; ',
+      '  opacity: 0.2; ',
       '  font-size: 100px; ',
       '  font-weight: bold; ',
       '  color: #333; ',
       '  pointer-events: none; ',
       '  z-index: 999;',
-      '">', 
+      '">',
       input$wdi_map_yr,
-      '</div>' 
+      '</div>'
     )
     
     l <- l %>%
       addControl(
         html = year_label,
-        position = "topleft" 
+        position = "topleft"
       )
-    l 
+    l
   })
   
   wdi_table_data <- reactive({
@@ -411,8 +526,6 @@ server <- function(input, output, session) {
     filename = function() { paste0("wdi_filtered_data_", Sys.Date(), ".csv") },
     content = function(file) { write.csv(wdi_table_data(), file, row.names = FALSE) }
   )
-  
-  
   
   airbnb_filtered <- reactive({
     df <- airbnb_reactive()
@@ -435,7 +548,7 @@ server <- function(input, output, session) {
       tags$p(style = "font-size: 0.75rem; font-weight: 400; margin: 0; opacity: 0.8;", paste0("Difference between ", start_year, " & ", end_year))
     )}
   
-  kpi_block_with_comparison <- function(title_text, metric_name, df, years_to_compare) { 
+  kpi_block_with_comparison <- function(title_text, metric_name, df, years_to_compare) {
     year_1 <- years_to_compare[1]
     year_2 <- years_to_compare[2]
     kpis_long <- df %>%
@@ -523,7 +636,12 @@ server <- function(input, output, session) {
                  tags$div(
                    style = "flex: 1 1 33%;",
                    comparison_bar_right(diff_text, year_1, year_2)
-                 )))))}
+                 )
+               )
+        )
+      )
+    )
+  }
   
   output$airbnb_kpis <- renderUI({
     df <- airbnb_filtered()
@@ -537,7 +655,8 @@ server <- function(input, output, session) {
           column(4, kpi_box("Avg Price", h2_value("N/A"), "Select criteria", color="light")),
           column(4, kpi_box("Listings", h2_value("N/A"), "Select criteria", color="light")),
           column(4, kpi_box("Reviews", h2_value("N/A"), "Select criteria", color="light"))
-        )))}
+        )))
+    }
     
     tagList(
       kpi_block_with_comparison(
@@ -559,7 +678,9 @@ server <- function(input, output, session) {
         metric_name = "Avg_Reviews",
         df = df,
         years_to_compare = years_to_compare
-      ))})
+      )
+    )
+  })
   
   
   
@@ -580,20 +701,20 @@ server <- function(input, output, session) {
   
   
   output$airbnb_map <- renderLeaflet({
-    df <- airbnb_filtered() 
-    req(nrow(df) > 0) 
+    df <- airbnb_filtered()
+    req(nrow(df) > 0)
     
     if (nrow(df) > 1000) { df <- df %>% sample_n(1000) }
     
     pal <- colorFactor(c("blue", "red"), domain = df$Year)
     
-    leaflet(df) %>% addTiles() %>% 
-      addCircleMarkers( 
-        lng = ~longitude, lat = ~latitude, radius = 4, color = ~pal(Year), 
-        stroke = FALSE, fillOpacity = 0.8, 
-        label = ~paste("Price: $", price, " | City:", City, " | Area:", neighbourhood, " | Type:", room_type, " | Year:", Year) 
-      ) %>% 
-      addLegend(pal = pal, values = ~Year, title = "Year", position = "bottomleft") 
+    leaflet(df) %>% addTiles() %>%
+      addCircleMarkers(
+        lng = ~longitude, lat = ~latitude, radius = 4, color = ~pal(Year),
+        stroke = FALSE, fillOpacity = 0.8,
+        label = ~paste("Price: $", price, " | City:", City, " | Area:", neighbourhood, " | Type:", room_type, " | Year:", Year)
+      ) %>%
+      addLegend(pal = pal, values = ~Year, title = "Year", position = "bottomleft")
   })
   
   output$airbnb_host_plot <- renderPlot({
@@ -606,7 +727,7 @@ server <- function(input, output, session) {
       facet_grid(City ~ room_type) +
       labs(x = "Host Listing Count (Log Scale)", y = "Reviews Per Month", title = "Host Activity vs. Popularity by City and Room Type") +
       theme_light()
-  })} 
-
+  })
+}
 
 shinyApp(ui, server)

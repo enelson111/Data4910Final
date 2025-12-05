@@ -101,6 +101,7 @@ The application uses a **multi-tab navigation interface** with three main sectio
 * Indicator dropdown covering economic, demographic, and environmental metrics
 * Optional log-scale transformation for handling wide-ranging values
 * Customizable table columns for downloading table data
+* **Custom data upload with variable mapping** - Users can upload their own WDI CSV files and map column names to required variables (Country, Year, GDP, Life Expectancy, Population)
 
 #### Visualizations:
 * **Summary KPIs:** Three-year comparison (initial year, average across range, final year) for Life Expectancy, GDP, and Population
@@ -133,6 +134,9 @@ The application uses a **multi-tab navigation interface** with three main sectio
 ### Technical Design Decisions
 
 * **Data Handling:**
+    * **Default data loading** - The app automatically loads the default WDI and Airbnb datasets if they exist in the app directory
+    * **Optional custom data upload** - Users can optionally upload their own WDI CSV file with any column structure
+    * **Flexible variable mapping** - When uploading custom data, users map their column names to required variables through dropdown menus
     * Fallback to **dummy data** if CSV files are missing (enables testing without datasets)
     * **Reactive filtering system** ensures real-time updates based on user inputs
     * **Downsampling of map markers** (1,000 max) to maintain performance with large datasets
@@ -141,6 +145,7 @@ The application uses a **multi-tab navigation interface** with three main sectio
     * Custom **KPI box component** with color-coding for visual hierarchy
     * **Responsive layout** with 3-column sidebar and 9-column main panel
     * **Tab-based organization** to reduce cognitive load
+    * **Collapsible upload panel** - Custom file upload UI only appears when needed, keeping the interface clean
 * **Performance Optimizations:**
     * **Reactive expressions** to minimize redundant calculations
     * **Conditional rendering** (e.g., `req()` function) to prevent errors from incomplete inputs
@@ -163,15 +168,15 @@ install.packages(c(
 ))
 ```
 
-## Required Data Files
+## Required Data Files (Optional)
 
-Place the following CSV files in the **same directory** as the R script:
+Place the following CSV files in the **same directory** as the R script for default functionality:
 
 * `world_bank_development_indicators.csv`
 * `AB_US_2020.csv`
 * `AB_US_2023.csv`
 
-> **Note:** The app will run with dummy data if files are missing, but for full functionality, ensure all three files are present.
+> **Note:** The app will run with dummy data if files are missing. You can also upload your own WDI data through the app interface.
 
 ---
 
@@ -187,14 +192,69 @@ Place the following CSV files in the **same directory** as the R script:
 
 * Start on the **Overview** tab to understand the datasets.
 * **Explore WDI data:**
+    * The app loads with default data automatically - start exploring immediately
     * Select countries of interest (try comparing regions like US, China, India)
     * Adjust year range to focus on specific periods
     * Switch between indicators to see different development metrics
     * Use the map view to identify geographic patterns
+    * **Upload custom data (optional):**
+        * Click "Upload Custom WDI CSV" in the sidebar
+        * Select your CSV file (any column structure works)
+        * Map your columns to the required variables:
+            * **Country Column** - Which column contains country names
+            * **Year Column** - Which column contains year values
+            * **GDP Column** - (Optional) Which column contains GDP data
+            * **Life Expectancy Column** - (Optional) Which column contains life expectancy data
+            * **Population Column** - (Optional) Which column contains population data
+        * Click "Apply Configuration" to update all visualizations with your custom data
+        * The app will automatically update all charts, maps, and tables to use your data
 * **Analyze Airbnb trends:**
     * Compare 2020 and 2023 to observe pandemic recovery patterns
     * Filter by city and room type to segment the market
     * Examine the host insights plot to understand listing behavior
+
+---
+
+## Using Custom WDI Data
+
+The dashboard supports uploading your own World Bank or similar development indicator data:
+
+### Step-by-Step Guide:
+
+1. **Prepare Your Data:**
+   * Ensure your CSV has columns for country/region names and year values
+   * Optional: Include columns for GDP, life expectancy, population, or other indicators
+   * Your column names can be anything - you'll map them in the next step
+
+2. **Upload Your File:**
+   * Navigate to the "Global Development (WDI)" tab
+   * Look for the "Custom File" section in the left sidebar
+   * Click "Upload Custom WDI CSV (Optional)" and select your file
+
+3. **Map Your Variables:**
+   * After upload, dropdown menus will appear
+   * Select which column in your data represents each variable:
+     * **Country Column:** Required - identifies countries/regions
+     * **Year Column:** Required - identifies time periods
+     * **GDP Column:** Optional - select "None" if not applicable. To ensure accurate display in the KPI summary, the values in this column **must be the full numerical amount (e.g., 1,000,000,000)**, not pre-scaled values like '1' if the unit is "billions." The application automatically scales and formats the number into billions (e.g., $1.00B).
+     * **Life Expectancy Column:** Optional - select "None" if not applicable
+     * **Population Column:** Optional - select "None" if not applicable
+
+4. **Apply Configuration:**
+   * Click the "Apply Configuration" button
+   * The app will process your data and update all visualizations
+   * You'll see a notification confirming successful configuration
+
+5. **Explore Your Data:**
+   * All controls (country selector, year range, etc.) will update to reflect your data
+   * All visualizations, maps, and tables will use your custom dataset
+   * KPI boxes will show metrics from your data (or "N/A" if columns weren't mapped)
+
+### Tips for Custom Data:
+* Your data doesn't need to match the default structure exactly
+* Map only the variables you have - unmapped variables will show "N/A"
+* Ensure year values are numeric (e.g., 2020, 2021) for proper sorting
+* The app handles missing values gracefully with `na.rm = TRUE`
 
 ---
 
@@ -205,11 +265,16 @@ Place the following CSV files in the **same directory** as the R script:
 * **Error: "File not found"**
     * Verify CSV files are in the same directory as the R script
     * The app will run with dummy data but with limited functionality
+    * Alternatively, upload your own data through the app interface
+* **Custom data not displaying properly:**
+    * Verify your year column contains numeric values
+    * Check that country names match the format in the Natural Earth dataset for map visualization
+    * Ensure you clicked "Apply Configuration" after mapping variables
 * **Map not displaying properly:**
     * Ensure `rnaturalearth` and `rnaturalearthdata` packages are installed
     * Try running `rnaturalearth::ne_download(returnclass = "sf")` to download map data
 * **Performance issues with large datasets:**
-    * The app automatically downsamples map points to **1,000** for performance.
+    * The app automatically downsamples map points to **1,000** for performance
     * Consider filtering to fewer countries/cities if the interface feels sluggish
 
 ---

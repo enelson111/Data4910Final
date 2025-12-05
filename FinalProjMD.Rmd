@@ -24,6 +24,7 @@ library(rlang) #for non-standard evaluation (dynamic column selection)
 library(purrr) #for functional programming tools
 library(tidyr) #for tidying data
 library(tibble) #for modern data frame
+library(plotly) 
 
 
 #creates a kpi box with a solid colored background
@@ -86,7 +87,7 @@ h2_value <- function(val) {
 ####wdi data prep
 import_wdi <- "world_bank_development_indicators.csv" #import file
 if (file.exists(import_wdi)) { #checks if exists
-  wdi_data <- read.csv(import_wdi) %>%
+  wdi_data_default <- read.csv(import_wdi) %>%
     mutate( #start data manipulation
       Date_Parsed = as.Date(as.character(date), format = "%m/%d/%Y"), #convert data col into data object
       Year = suppressWarnings(as.integer(format(Date_Parsed, "%Y"))) #extracts year as integer from the date
@@ -96,7 +97,7 @@ if (file.exists(import_wdi)) { #checks if exists
     filter(!is.na(Year)) #filters out rows where year was not extracted properly
 } else { #execute if file not found
   message("WDI file not found. Using dummy data.") #creates dummy data to use
-  wdi_data <- data.frame( 
+  wdi_data_default <- data.frame( 
     Country = c("A", "B", "A", "B"), 
     Year = c(2010, 2010, 2011, 2011), 
     population = c(1e6, 2e6, 1.1e6, 2.1e6), 
@@ -111,9 +112,9 @@ if (file.exists(import_wdi)) { #checks if exists
     rural_population = c(200000, 400000, 210000, 410000) 
   )} 
 
-wdi_vars <- names(wdi_data) %>% setdiff(c("Country", "Year")) #extracts names of all columns and removes country+year for indicator variables
+wdi_vars <- names(wdi_data_default) %>% setdiff(c("Country", "Year")) #extracts names of all columns and removes country+year for indicator variables
 
-wdi_years <- sort(unique(wdi_data$Year)) #extracts and sorts year
+wdi_years <- sort(unique(wdi_data_default$Year)) #extracts and sorts year
 wdi_min_year <- if(length(wdi_years) > 0) min(wdi_years) #determines min year
 wdi_max_year <- if(length(wdi_years) > 0) max(wdi_years)#determines max year
 
@@ -196,7 +197,7 @@ ui <- navbarPage( #starts the main navigation panel for the app
             " Compare key metrics, price distributions, and host activity for Airbnb listings in major US cities, highlighting changes between 2020 and 2023. Features year-over-year KPIs, a box plot for price analysis, and an interactive map of listings."
           )
         ),
-        p(strong("Note:"), " This app is pre-configured for WDI ('world_bank_development_indicators.csv'), 'AB_US_2020.csv', and 'AB_US_2023.csv'. Please ensure these files are available in the app directory for the full functionality.")
+        p(strong("Note:"), " This app is pre-configured for WDI ('world_bank_development_indicators.csv'), 'AB_US_2020.csv', and 'AB_US_2023.csv'. Please ensure these files are available in the app directory for the full functionality. You may also upload your own WDI dataset to explore.")
       ) 
     ) 
   ), 
@@ -206,23 +207,36 @@ ui <- navbarPage( #starts the main navigation panel for the app
     "Global Development (WDI)", #set title
     sidebarLayout( #starts the sidebar and main panel layout
       sidebarPanel( #starts the left side panel for user controls
-        h3("WDI Explorer Controls"), 
-        width = 3, 
+        h3("WDI Explorer Controls"),
+        width = 3,
         selectizeInput(inputId = "wdi_countries", label = "Select Countries:", #creates dropdown to select country inputs
-                       choices = sort(unique(wdi_data$Country)), #lists all countries in dropdown
-                       selected = c("United States", "India", "China"), #default selected countries
-                       multiple = TRUE), #can select multiple countries
-        sliderInput(inputId = "wdi_years", label = "Select Year Range:",  #year slider
-                    min = wdi_min_year, max = wdi_max_year, #sets min as earliest year and max as latest year
-                    value = c(wdi_min_year, wdi_max_year), sep = "", step = 1), #default to all years
+            choices = sort(unique(wdi_data$Country)), #lists all countries in dropdown
+            selected = c("United States", "India", "China"), #default selected countries
+            multiple = TRUE), #can select multiple countries
+        sliderInput(inputId = "wdi_years", label = "Select Year Range:", #year slider
+            min = wdi_min_year, max = wdi_max_year, #sets min as earliest year and max as latest year
+            value = c(wdi_min_year, wdi_max_year), sep = "", step = 1), #default to all years
         selectInput("wdi_indicator", "Select Indicator:", choices = wdi_vars, #select indicator to analyze
-                    selected = "GDP_current_US"), #default to gdp
+            selected = "GDP_current_US"), #default to gdp
         checkboxInput("wdi_logy", "Log scale (y-axis)", value = FALSE), #check for log scale
         selectizeInput(inputId = "wdi_table_cols", label = "Select Columns for Table/Download:", #select variables for the downloadable table
-                       choices = wdi_vars, #give choices of all variables in dataset
-                       selected = c("GDP_current_US", "life_expectancy_at_birth", "population", "Year"), #default selections
-                       multiple = TRUE) #can select multiple
-      ), 
+            choices = wdi_vars, #give choices of all variables in dataset
+            selected = c("GDP_current_US", "life_expectancy_at_birth", "population", "Year"), #default selections
+            multiple = TRUE), #can select multiple
+        wellPanel( #start panel to group the custom file upload controls
+            h4("Custom File"), #title
+            fileInput("wdi_file", "Upload Custom WDI CSV (Optional)", accept = ".csv"), #file input for CSV
+            conditionalPanel( #panel appears if condition is met
+                condition = "output.wdi_custom_uploaded", #condition is file must be uploaded
+                hr(),
+                h5("Map Your Variables"),#heading
+                uiOutput("wdi_country_map"), #placeholder to map country
+                uiOutput("wdi_year_map"), #placeholder to map year
+                uiOutput("wdi_indicator_maps"),
+                actionButton("wdi_apply", "Apply Configuration", class = "btn-primary"), #button to trigger mapping/file upload
+                hr()
+            )
+        )),
       mainPanel( #starts the right-side panel for outputs
         tabsetPanel( #starts a set of subtabs for different visualizations
           tabPanel("Summary KPIs", h4("Key Global Development Indicators"), uiOutput("wdi_kpis")), #tab 1 for kpis
@@ -285,19 +299,112 @@ ui <- navbarPage( #starts the main navigation panel for the app
 
 
 server <- function(input, output, session) { #defines the server function
-  wdi_reactive <- reactive({ wdi_data }) #creates a reactive expression for the wdi data
+  wdi_data <- reactiveVal(wdi_data_default) #stores currently active dataset
+  wdi_raw_data <- reactiveVal(NULL) #holds the raw uploaded user data
+  wdi_custom_uploaded <- reactiveVal(FALSE) #determines if data is the default or user uploaded
+  wdi_reactive <- reactive({ wdi_data() }) #creates a reactive expression for the wdi data
   airbnb_reactive <- reactive({ airbnb_data }) #creates a reactive expression for the airbnb data
   
   ####wdi server logic starts here ####
+    
+  observe({ #reacts to changes in wdi_data() and updates ui controls based on the new data dimensions
+    df <- wdi_data() #retrieve current wdi data frame from the reactive value
+    countries <- sort(unique(df$Country)) #extract and sort unique country names
+    years <- sort(unique(df$Year)) #extract and sort unique Year values
+    indicators <- setdiff(names(df), c("Country", "Year")) #find all columns that are indicators (not country/year)
   
-  wdi_filtered <- reactive({ #starts the reactive expression for filtering wdi data
-    df <- wdi_reactive() #retrieve data 
-    req(input$wdi_countries, input$wdi_years) #ensures required inputs are selected
-    df %>% 
-      filter(Country %in% input$wdi_countries, #keep only selected countries
-             Year >= input$wdi_years[1], Year <= input$wdi_years[2]) #keeps years between selected years
-  }) 
+    updateSelectizeInput(session, "wdi_countries", choices = countries, selected = head(countries, 3)) #update country selection input with new list
+    updateSliderInput(session, "wdi_years", min = min(years), max = max(years), value = c(min(years), max(years))) #update year slider range and default value
+    updateSelectInput(session, "wdi_indicator", choices = indicators, selected = indicators[1]) #update single indicator select input
+    updateSelectizeInput(session, "wdi_table_cols", choices = indicators, selected = head(indicators, 4)) #update table column selection input
   
+    updateNumericInput(session, "wdi_map_yr", #update map year input
+      value = max(years), #set default map year to the latest year
+      min = min(years), #set minimum year for the map input
+      max = max(years)) #set maximum year for the map input
+  })
+  
+  output$wdi_custom_uploaded <- reactive({ !is.null(wdi_raw_data()) }) #reactive true if a custom file has been uploaded 
+  outputOptions(output, "wdi_custom_uploaded", suspendWhenHidden = FALSE) #ensure the output is updated
+  
+  observeEvent(input$wdi_file, { #triggered when a file is uploaded
+    req(input$wdi_file) #require a file object exists
+  
+    df <- read.csv(input$wdi_file$datapath, stringsAsFactors = FALSE) #read uploaded CSV file into a data frame
+    wdi_raw_data(df) #store raw uploaded data frame in reactive value
+    wdi_custom_uploaded(TRUE) #set true to display the mapping controls
+    showNotification("File uploaded successfully. Map your variables now.", type = "message") #notify user of successful upload
+  })
+  output$wdi_country_map <- renderUI({ #render ui for selecting the country column from the uploaded file
+    req(wdi_raw_data()) #require raw data has been uploaded
+    cols <- names(wdi_raw_data()) #get column names of raw data
+    selectInput("wdi_country_col", "Country Column:", choices = cols, selected = cols[1]) #dropdown to map country column
+  })
+  output$wdi_year_map <- renderUI({ #renders ui for selecting the year column from the uploaded file
+    req(wdi_raw_data()) #require raw data has been uploaded
+    cols <- names(wdi_raw_data()) #get column names of the raw data
+    selectInput("wdi_year_col", "Year Column:", choices = cols, selected = cols[2]) #dropdown to map year column
+  })
+  output$wdi_indicator_maps <- renderUI({ #render ui for selecting indicator columns (gdp, life exp., pop.)
+    req(wdi_raw_data()) #require raw data has been uploaded
+    cols <- names(wdi_raw_data()) #get column names of raw data
+    indicator_cols <- setdiff(cols, c(input$wdi_country_col, input$wdi_year_col)) #columns remaining after selecting country and year
+  
+    tagList( #group multiple ui elements together
+      selectInput("wdi_gdp_col", "GDP Column:", choices = c("None", indicator_cols), selected = "None"), #dropdown to map gdp column
+      selectInput("wdi_life_exp_col", "Life Expectancy Column:", choices = c("None", indicator_cols), selected = "None"), #dropdown to map life exp column
+      selectInput("wdi_pop_col", "Population Column:", choices = c("None", indicator_cols), selected = "None") #dropdown to map pop column
+    )
+  })
+  
+  observeEvent(input$wdi_apply, { #triggered when apply configuration button is clicked
+    req(wdi_raw_data(), input$wdi_country_col, input$wdi_year_col) #require raw data and country/year mapping inputs
+  
+    df <- wdi_raw_data() #get raw uploaded data
+    
+    mapping_vec <- c( #start building vector for column renaming
+      "Country" = input$wdi_country_col, #map country column to user selected column
+      "Year" = input$wdi_year_col #map year column to user selected column
+    )
+    
+    if (input$wdi_gdp_col != "None") mapping_vec["GDP_current_US"] <- input$wdi_gdp_col #add gdp if selected
+    if (input$wdi_life_exp_col != "None") mapping_vec["life_expectancy_at_birth"] <- input$wdi_life_exp_col #add life exp if selected
+    if (input$wdi_pop_col != "None") mapping_vec["population"] <- input$wdi_pop_col #add pop if selected
+    
+    df <- df %>% rename(!!!mapping_vec) #apply renaming vector to the data frame
+    
+    if ("Year" %in% names(df)) { #check if year exists
+      df <- df %>% #data cleaning pipeline
+        mutate(Year = suppressWarnings(as.integer(Year))) %>% #convert year to integer
+        filter(!is.na(Year)) #filter out rows where the year conversion failed
+    }
+
+    wdi_data(df) #update main reactive value with the newly cleaned and mapped data frame
+    
+    countries <- sort(unique(df$Country)) #extract and sort unique country names from the new data
+    years <- sort(unique(df$Year)) #extract and sort unique year values from the new data
+    indicators <- setdiff(names(df), c("Country", "Year")) #determine the set of available indicators
+    
+    updateSelectizeInput(session, "wdi_countries", choices = countries, selected = head(countries, 3)) #update country dropdown
+    updateSliderInput(session, "wdi_years", min = min(years), max = max(years), value = c(min(years), max(years))) #update year slider range and value
+    updateSelectInput(session, "wdi_indicator", choices = indicators, selected = indicators[1]) #update the single indicator dropdown
+    updateSelectizeInput(session, "wdi_table_cols", choices = indicators, selected = head(indicators, 4)) #update table column dropdown
+    
+    updateNumericInput(session, "wdi_map_yr", #update map year selection input
+      value = max(years), #set default map year to the max year
+      min = min(years), #set minimum map year
+      max = max(years)) #set maximum map year
+    
+    showNotification("Custom WDI data configured successfully! App charts and tables are updated.", type = "message") #notify user of successful mapping
+  })
+    wdi_filtered <- reactive({ #reactive expression to filter the wdi data based on user input
+    df <- wdi_reactive() #get the most current wdi data
+    req(input$wdi_countries, input$wdi_years) #require country and year selection inputs to proceed
+    df %>%
+      filter(Country %in% input$wdi_countries, #filter by selected countries
+             Year >= input$wdi_years[1], Year <= input$wdi_years[2]) #filter by selected year range
+  })
+    
   output$wdi_kpis <- renderUI({ #renders kpi boxes
     df <- wdi_filtered() #gets the filtered wdi data
     req(nrow(df) > 0) #requires at least one row of data
@@ -447,7 +554,7 @@ server <- function(input, output, session) { #defines the server function
       '  left: 50%; ', #center horizontally
       '  transform: translate(-50%, -50%); ', #adjust for element size to truly center
       '  margin-left: 12.5%; ', #shift right to visually center in the main panel area
-      '  opacity: 0.3; ', #make the text semi-transparent
+      '  opacity: 0.2; ', #make the text semi-transparent
       '  font-size: 100px; ', #make the font very large
       '  font-weight: bold; ', #make the font bold
       '  color: #333; ', #set the text color
